@@ -77,19 +77,19 @@ class BinaryTree<T>(private val comparator: Comparator<T>) {
             return list
 
         intoList(list, node.left)
-        list.add(node.element)
+        node.elements.forEach { list.add(it) }
         intoList(list, node.right)
 
         return list
     }
 
     private fun recAdd(node: Node<T>, element: T): Unit =
-        when (comparator.compare(element, node.element)) {
+        when (comparator.compare(element, node.comparableElement)) {
             0 ->
-                // TODO how to handle equal elements?
-                if (element != node.element)
-                    node.createLeft(Node(element))
+                if (element !in node.elements)
+                    node.elements += element
                 else {
+                    // do nothing
                 }
             in Int.MIN_VALUE..-1 -> when (node.left) {
                 is Empty -> node.createLeft(Node(element))
@@ -102,31 +102,36 @@ class BinaryTree<T>(private val comparator: Comparator<T>) {
         }
 
     private fun recRemove(node: Node<T>, element: T, removal: (BinaryTreeElement<T>) -> Unit): Unit =
-        when (comparator.compare(element, node.element)) {
+        when (comparator.compare(element, node.comparableElement)) {
             0 ->
-                // TODO how to handle non-equal elements?
-                if (element == node.element) {
-                    if (node.left is Empty && node.right is Empty) // 0 children
-                        removal(node.parent)
-                    else if (node.left is Empty && node.right !is Empty) { // 1 child (right)
-                        node.element = (node.right as Node).element
-                    } else if (node.left !is Empty && node.right is Empty) { // 1 child (left)
-                        node.element = (node.left as Node).element
-                    } else { // 2 children
-                        if (node.right is Node) {
-                            val rightNode = node.right as Node
-                            val successor = minimum(rightNode)
-                            node.element = successor.element
-                            recRemove(successor, successor.element) { parent ->
-                                if (parent == node) {
-                                    node.right = Empty()
-                                } else if (parent is Node)
-                                    parent.left = Empty()
+                if (element in node.elements) {
+                    // remove element
+                    node.elements -= element
+
+                    // if there are no comparable elements left, reorder tree
+                    if (node.elements.isEmpty())
+
+                        when ((node.left is Empty) to (node.right is Empty)) {
+
+                            true to true -> // 0 children
+                                removal(node.parent)
+                            true to false -> // 1 child (right)
+                                node.elements = (node.right as Node).elements
+                            false to true ->// 1 child (left)
+                                node.elements = (node.left as Node).elements
+                            else -> { // 2 children
+                                val rightNode = node.right as Node
+                                val successor = minimum(rightNode)
+                                node.elements = successor.elements
+                                node.recRemove(successor)
                             }
-                        } else {
+
                         }
+                    else {
+                        // do nothing
                     }
                 } else {
+                    // do nothing, the element does not exist anyway
                 }
             in Int.MIN_VALUE..-1 ->
                 if (node.left is Node)
@@ -148,8 +153,8 @@ class BinaryTree<T>(private val comparator: Comparator<T>) {
 
     private fun recContains(tree: BinaryTreeElement<T>, element: T): Boolean = when (tree) {
 
-        is Node<T> -> when (comparator.compare(element, tree.element)) {
-            0 -> true
+        is Node<T> -> when (comparator.compare(element, tree.comparableElement)) {
+            0 -> element in tree.elements
             in Int.MIN_VALUE..-1 -> recContains(tree.left, element)
             else -> recContains(tree.right, element)
         }
@@ -176,13 +181,13 @@ class BinaryTree<T>(private val comparator: Comparator<T>) {
 sealed class BinaryTreeElement<T>
 
 class Node<T>(
-    var element: T,
+    var elements: List<T>,
     var parent: BinaryTreeElement<T>,
     var left: BinaryTreeElement<T>,
     var right: BinaryTreeElement<T>
 ) : BinaryTreeElement<T>() {
 
-    constructor(element: T) : this(element, Empty(), Empty(), Empty())
+    constructor(element: T, vararg elements: T) : this(mutableListOf(element, *elements), Empty(), Empty(), Empty())
 
     fun createLeft(left: Node<T>) {
         this.left = left
@@ -192,6 +197,21 @@ class Node<T>(
     fun createRight(right: Node<T>) {
         this.right = right
         right.parent = this
+    }
+
+    var comparableElement = elements[0]
+
+    fun recRemove(toRemove: Node<T>): Unit = when (toRemove) {
+        right -> right = Empty()
+        left -> left = Empty()
+        else ->
+            when {
+                right is Node -> (right as Node).recRemove(toRemove)
+                left is Node -> (left as Node).recRemove(toRemove)
+                else -> {
+                    // do nothing
+                }
+            }
     }
 
 }
