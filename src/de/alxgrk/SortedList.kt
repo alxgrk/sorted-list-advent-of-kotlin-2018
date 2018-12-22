@@ -88,37 +88,40 @@ class BinaryTree<T>(private val comparator: Comparator<T>) {
             0 ->
                 // TODO how to handle equal elements?
                 if (element != node.element)
-                    node.left = Node(element)
+                    node.createLeft(Node(element))
                 else {
                 }
             in Int.MIN_VALUE..-1 -> when (node.left) {
-                is Empty -> node.left = Node(element)
+                is Empty -> node.createLeft(Node(element))
                 is Node -> recAdd(node.left as Node, element)
             }
             else -> when (node.right) {
-                is Empty -> node.right = Node(element)
+                is Empty -> node.createRight(Node(element))
                 is Node -> recAdd(node.right as Node, element)
             }
         }
 
-    private fun recRemove(node: Node<T>, element: T, removal: (T) -> Unit): Unit =
+    private fun recRemove(node: Node<T>, element: T, removal: (BinaryTreeElement<T>) -> Unit): Unit =
         when (comparator.compare(element, node.element)) {
             0 ->
                 // TODO how to handle non-equal elements?
                 if (element == node.element) {
                     if (node.left is Empty && node.right is Empty) // 0 children
-                        removal(element)
+                        removal(node.parent)
                     else if (node.left is Empty && node.right !is Empty) { // 1 child (right)
-                        node.copyFrom(node.right as Node)
+                        node.element = (node.right as Node).element
                     } else if (node.left !is Empty && node.right is Empty) { // 1 child (left)
-                        node.copyFrom(node.left as Node)
+                        node.element = (node.left as Node).element
                     } else { // 2 children
                         if (node.right is Node) {
                             val rightNode = node.right as Node
                             val successor = minimum(rightNode)
-                            node.copyFrom(successor)
-                            recRemove(rightNode, successor.element) {
-                                node.left = Empty()
+                            node.element = successor.element
+                            recRemove(successor, successor.element) { parent ->
+                                if (parent == node) {
+                                    node.right = Empty()
+                                } else if (parent is Node)
+                                    parent.left = Empty()
                             }
                         } else {
                         }
@@ -127,15 +130,17 @@ class BinaryTree<T>(private val comparator: Comparator<T>) {
                 }
             in Int.MIN_VALUE..-1 ->
                 if (node.left is Node)
-                    recRemove(node.left as Node, element) {
-                        node.left = Empty()
+                    recRemove(node.left as Node, element) { parent ->
+                        if (parent is Node)
+                            parent.left = Empty()
                     }
                 else {
                 }
             else ->
                 if (node.right is Node)
-                    recRemove(node.right as Node, element) {
-                        node.right = Empty()
+                    recRemove(node.right as Node, element) { parent ->
+                        if (parent is Node)
+                            parent.right = Empty()
                     }
                 else {
                 }
@@ -172,16 +177,21 @@ sealed class BinaryTreeElement<T>
 
 class Node<T>(
     var element: T,
+    var parent: BinaryTreeElement<T>,
     var left: BinaryTreeElement<T>,
     var right: BinaryTreeElement<T>
 ) : BinaryTreeElement<T>() {
 
-    constructor(element: T) : this(element, Empty(), Empty())
+    constructor(element: T) : this(element, Empty(), Empty(), Empty())
 
-    fun copyFrom(another: Node<T>) {
-        element = another.element
-        left = another.left
-        right = another.right
+    fun createLeft(left: Node<T>) {
+        this.left = left
+        left.parent = this
+    }
+
+    fun createRight(right: Node<T>) {
+        this.right = right
+        right.parent = this
     }
 
 }
